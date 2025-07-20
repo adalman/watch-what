@@ -4,3 +4,4 @@ psycopg2-binary  # PostgreSQL adapter
 SQLAlchemy
 python-dotenv    # For loading .env file
 alembic          # For database migrations
+websockets       # For WebSocket connection management

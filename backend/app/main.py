@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 import uvicorn
+from app.websocket_manager import manager
+from fastapi import WebSocket
+from fastapi.websockets import WebSocketDisconnect
 
 # Import our modules
 from .database import get_db, engine
@@ -178,6 +181,19 @@ async def cast_vote(session_id: int, vote: VoteCreate, db: Session = Depends(get
     
     # Create vote
     db_vote = crud.create_vote(db=db, vote=vote)
+
+    # Broadcast the vote to all connected clients
+    await manager.broadcast_to_session({
+        "type": "vote_cast",
+        "session_id": session_id,
+        "vote": {
+            "movie_id": vote.movie_id,
+            "participant_id": vote.participant_id,
+            "round": vote.round
+        },
+        "message": f"{db_participant.name} voted for {db_movie.title}"
+    }, session_id)
+    
     return db_vote
 
 @app.get("/sessions/{session_id}/votes/round/{round_number}", response_model=RoundResults)
@@ -232,6 +248,27 @@ async def advance_to_next_round(session_id: int, db: Session = Depends(get_db)):
         "current_round": db_session.current_round,
         "status": db_session.status
     }
+
+# WebSocket endpoints
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: int):
+    # Accept the WebSocket connection
+    await manager.connect(websocket, session_id)
+
+    try:
+        while True:
+            message = await websocket.receive_text()
+            process_message(message)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        print(f"Client disconnected for session {session_id}")
+    except Exception as e:
+        print(f"Error in WebSocket: {e}")
+        manager.disconnect(websocket)
+
+def process_message(message: str):
+    """Process incoming messages from the WebSocket"""
+    print(f"Received message: {message}")
 
 # Error handlers
 @app.exception_handler(404)
