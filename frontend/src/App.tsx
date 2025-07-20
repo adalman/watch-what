@@ -4,6 +4,7 @@ import { SessionProvider } from './context/SessionContext';
 import { useSession } from './context/SessionContext';
 import SessionCreator from './components/session/SessionCreator';
 import SessionJoiner from './components/session/SessionJoiner';
+import SessionView from './components/session/SessionView';
 
 // Main app content that uses the session context
 function AppContent() {
@@ -18,13 +19,7 @@ function AppContent() {
       <main>
         
         {isInSession ? (
-          <div className="session-interface">
-            <h2>Welcome to Session: {sessionState.session?.code}</h2>
-            <p>Status: {sessionState.session?.status}</p>
-            <p>Participant: {sessionState.currentParticipant?.name}</p>
-            {/* TODO: Add SessionView component here */}
-            <p>Session interface coming soon...</p>
-          </div>
+          <SessionView />
         ) : (
           <div>
             <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: '#1f2937' }}>
@@ -45,7 +40,14 @@ function AppContent() {
                 {sessionState.error}
               </div>
             )}
-            <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '1.5rem', 
+              justifyContent: 'center', 
+              flexWrap: 'wrap',
+              maxWidth: '1000px',
+              margin: '0 auto'
+            }}>
               <SessionCreator />
               <SessionJoiner />
             </div>
