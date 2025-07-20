@@ -11,17 +11,23 @@ A real-time movie voting application built with FastAPI, SQLAlchemy, and Pydanti
 - **Winner Tracking**: Automatic winner detection when only one movie remains
 - **Real-time Status**: Track session progress and voting results
 - **RESTful API**: Complete API for frontend integration
+- **Modern UI**: Clean, responsive React frontend with TypeScript
+- **Session Creation & Joining**: Easy-to-use forms for creating and joining sessions
+- **Error Handling**: User-friendly error messages and validation
 
 ## Architecture
 
 - **Backend**: FastAPI with SQLAlchemy ORM
+- **Frontend**: React with TypeScript, Context API for state management
 - **Database**: SQLite (development) / PostgreSQL (production ready)
 - **Validation**: Pydantic schemas for request/response validation
+- **API Communication**: Axios for HTTP requests
 - **Containerization**: Docker Compose for easy deployment
 
 ## Prerequisites
 
 - Python 3.8+
+- Node.js 16+ and npm
 - pip
 - Docker (optional, for containerized deployment)
 
@@ -45,16 +51,33 @@ A real-time movie voting application built with FastAPI, SQLAlchemy, and Pydanti
 
 3. **Configure environment variables**
    ```bash
-   cp .env.example .env
-   # Edit .env with your database URL and other settings
+   # Create .env file with database URL
+   echo "DATABASE_URL=sqlite:///./watch_what.db" > .env
    ```
 
-4. **Run the application**
+4. **Set up the frontend**
    ```bash
+   cd ../frontend
+   npm install
+   ```
+
+5. **Run both servers**
+   
+   **Terminal 1 - Backend:**
+   ```bash
+   cd backend
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
+   
+   **Terminal 2 - Frontend:**
+   ```bash
+   cd frontend
+   npm start
+   ```
 
-5. **Access the API**
+6. **Access the application**
+   - Frontend: http://localhost:3000
    - API Documentation: http://localhost:8000/docs
    - Alternative Docs: http://localhost:8000/redoc
 
@@ -70,6 +93,36 @@ A real-time movie voting application built with FastAPI, SQLAlchemy, and Pydanti
 2. **Access the application**
    - API: http://localhost:8000
    - Documentation: http://localhost:8000/docs
+
+## Frontend Structure
+
+The React frontend is organized as follows:
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   └── session/
+│   │       ├── SessionCreator.tsx    # Create new sessions
+│   │       ├── SessionJoiner.tsx     # Join existing sessions
+│   │       └── SessionView.tsx       # Display session details
+│   ├── context/
+│   │   └── SessionContext.tsx        # Global session state management
+│   ├── services/
+│   │   └── api.ts                    # API communication layer
+│   ├── types/
+│   │   └── api.ts                    # TypeScript type definitions
+│   └── App.tsx                       # Main application component
+├── package.json
+└── tsconfig.json
+```
+
+### Key Components
+
+- **SessionCreator**: Form to create new voting sessions
+- **SessionJoiner**: Form to join existing sessions with session codes
+- **SessionContext**: React Context for global session state management
+- **API Service**: Axios-based service for backend communication
 
 ## API Documentation
 

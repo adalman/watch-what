@@ -334,13 +334,21 @@ def process_message(message: str):
     print(f"Received message: {message}")
 
 # Error handlers
+from fastapi.responses import JSONResponse
+
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    return {"error": "Resource not found", "detail": str(exc)}
+    return JSONResponse(
+        status_code=404,
+        content={"error": "Resource not found", "detail": str(exc)}
+    )
 
 @app.exception_handler(422)
 async def validation_error_handler(request, exc):
-    return {"error": "Validation error", "detail": str(exc)}
+    return JSONResponse(
+        status_code=422,
+        content={"error": "Validation error", "detail": str(exc)}
+    )
 
 # Run the application
 if __name__ == "__main__":
