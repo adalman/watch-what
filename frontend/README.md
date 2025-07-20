@@ -19,6 +19,17 @@ You will also see any lint errors in the console.
 Launches the test runner in the interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
+**Testing Coverage**: The project includes comprehensive tests for components, context, and API services with 43 total tests covering form validation, user interactions, error handling, and accessibility.
+
+**Quick Test Commands**:
+```bash
+npm test                    # Run tests in watch mode
+npm test -- --coverage     # Run tests with coverage report
+npm test -- --watchAll=false # Run tests once
+```
+
+For detailed testing information, see [TESTING.md](./TESTING.md).
+
 ### `npm run build`
 
 Builds the app for production to the `build` folder.\
