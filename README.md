@@ -2,7 +2,7 @@
 
 A real-time movie voting application built with FastAPI, SQLAlchemy, and Pydantic. Users can create voting sessions, submit movies, and vote to determine which movie to watch next.
 
-## 🎬 Features
+## Features
 
 - **Session Management**: Create unique voting sessions with 6-character codes
 - **Movie Submissions**: Participants can submit movies for consideration
@@ -12,20 +12,20 @@ A real-time movie voting application built with FastAPI, SQLAlchemy, and Pydanti
 - **Real-time Status**: Track session progress and voting results
 - **RESTful API**: Complete API for frontend integration
 
-## 🏗️ Architecture
+## Architecture
 
 - **Backend**: FastAPI with SQLAlchemy ORM
 - **Database**: SQLite (development) / PostgreSQL (production ready)
 - **Validation**: Pydantic schemas for request/response validation
 - **Containerization**: Docker Compose for easy deployment
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.8+
 - pip
 - Docker (optional, for containerized deployment)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Local Development
 
@@ -71,7 +71,7 @@ A real-time movie voting application built with FastAPI, SQLAlchemy, and Pydanti
    - API: http://localhost:8000
    - Documentation: http://localhost:8000/docs
 
-## 📚 API Documentation
+## API Documentation
 
 ### Core Endpoints
 
@@ -140,7 +140,7 @@ curl -X POST "http://localhost:8000/sessions/1/votes/" \
 curl -X POST "http://localhost:8000/sessions/1/next-round"
 ```
 
-## 🗄️ Database Schema
+## Database Schema
 
 ### Core Models
 
@@ -174,7 +174,7 @@ curl -X POST "http://localhost:8000/sessions/1/next-round"
 - `round`: Voting round number
 - `created_at`: Vote creation timestamp
 
-## 🎯 Voting Logic
+## Voting Logic
 
 ### How It Works
 
@@ -191,7 +191,7 @@ curl -X POST "http://localhost:8000/sessions/1/next-round"
 - Movies with the same vote count are not eliminated (tie protection)
 - Session finishes when only one movie remains active
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -208,7 +208,7 @@ DEBUG=True
 - **SQLite (Development)**: `sqlite:///./watch_what.db`
 - **PostgreSQL (Production)**: `postgresql://user:password@localhost/watch_what`
 
-## 🧪 Testing
+## Testing
 
 ### Manual Testing
 
@@ -238,7 +238,7 @@ curl -X POST "http://localhost:8000/sessions/$SESSION_ID/participants/" \
 # Submit movies and vote...
 ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Production Considerations
 
@@ -262,7 +262,7 @@ docker run -d \
   watch-what:latest
 ```
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -270,17 +270,17 @@ docker run -d \
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## Support
 
 - **Issues**: Report bugs and feature requests on GitHub
 - **Documentation**: Check the API docs at `/docs` when running locally
 - **Questions**: Open a GitHub discussion for general questions
 
-## 🔮 Roadmap
+## Roadmap
 
 - [ ] WebSocket support for real-time updates
 - [ ] Frontend web application
@@ -293,4 +293,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ for movie lovers everywhere**
+**Made with love for movie lovers everywhere**

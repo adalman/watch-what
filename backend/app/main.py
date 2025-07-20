@@ -98,6 +98,19 @@ async def join_session(session_id: int, participant: ParticipantCreate, db: Sess
     
     # Create participant
     db_participant = crud.create_participant(db=db, participant=participant)
+    
+    # Broadcast the participant join to all connected clients
+    await manager.broadcast_to_session({
+        "type": "participant_joined",
+        "session_id": session_id,
+        "participant": {
+            "id": db_participant.id,
+            "name": db_participant.name,
+            "session_id": db_participant.session_id
+        },
+        "message": f"{db_participant.name} joined the session"
+    }, session_id)
+    
     return db_participant
 
 @app.get("/sessions/{session_id}/participants/", response_model=List[ParticipantResponse])
@@ -131,6 +144,20 @@ async def submit_movie(session_id: int, movie: MovieCreate, db: Session = Depend
     
     # Create movie
     db_movie = crud.create_movie(db=db, movie=movie)
+    
+    # Broadcast the movie submission to all connected clients
+    await manager.broadcast_to_session({
+        "type": "movie_submitted",
+        "session_id": session_id,
+        "movie": {
+            "id": db_movie.id,
+            "title": db_movie.title,
+            "session_id": db_movie.session_id,
+            "submitted_by_participant_id": db_movie.submitted_by_participant_id
+        },
+        "message": f"'{db_movie.title}' was submitted by {db_participant.name}"
+    }, session_id)
+    
     return db_movie
 
 @app.get("/sessions/{session_id}/movies/", response_model=List[MovieResponse])
@@ -238,15 +265,51 @@ async def update_session_status(session_id: int, status: str = Query(..., descri
 async def advance_to_next_round(session_id: int, db: Session = Depends(get_db)):
     """Advance session to the next voting round"""
     # Advance to next round
-    db_session = crud.advance_session_round(db=db, session_id=session_id)
-    if db_session is None:
+    result = crud.advance_session_round(db=db, session_id=session_id)
+    if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    db_session = result["session"]
+    eliminated_movies = result["eliminated_movies"]
+    old_round = result["old_round"]
+    new_round = result["new_round"]
+    winner = result["winner"]
+    
+    # Broadcast eliminated movies
+    for movie in eliminated_movies:
+        await manager.broadcast_to_session({
+            "type": "movie_eliminated",
+            "session_id": session_id,
+            "movie": movie,
+            "message": f"'{movie['title']}' was eliminated with {movie['vote_count']} vote(s) in round {old_round}"
+        }, session_id)
+    
+    # Broadcast round advancement
+    await manager.broadcast_to_session({
+        "type": "round_advanced",
+        "session_id": session_id,
+        "old_round": old_round,
+        "new_round": new_round,
+        "eliminated_count": len(eliminated_movies),
+        "message": f"Advanced to round {new_round}" + (f" - {len(eliminated_movies)} movie(s) eliminated" if eliminated_movies else "")
+    }, session_id)
+    
+    # Broadcast session finished if there's a winner
+    if winner:
+        await manager.broadcast_to_session({
+            "type": "session_finished",
+            "session_id": session_id,
+            "winner": winner,
+            "message": f"'{winner['title']}' is the winner!"
+        }, session_id)
     
     return {
         "message": f"Advanced to round {db_session.current_round}",
         "session_id": session_id,
         "current_round": db_session.current_round,
-        "status": db_session.status
+        "status": db_session.status,
+        "eliminated_movies": eliminated_movies,
+        "winner": winner
     }
 
 # WebSocket endpoints

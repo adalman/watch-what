@@ -44,8 +44,8 @@ def update_session_status(db: Session, session_id: int, status: str) -> Optional
         db.refresh(db_session)
     return db_session
 
-def advance_session_round(db: Session, session_id: int) -> Optional[SessionModel]:
-    """Advance session to next round and eliminate movies with most votes"""
+def advance_session_round(db: Session, session_id: int) -> Optional[dict]:
+    """Advance session to next round and eliminate movies with most votes. Returns detailed results."""
     db_session = get_session(db, session_id)
     if not db_session:
         return None
@@ -68,6 +68,9 @@ def advance_session_round(db: Session, session_id: int) -> Optional[SessionModel
         if vote.movie_id in vote_counts:
             vote_counts[vote.movie_id] += 1
     
+    # Track eliminated movies for broadcasting
+    eliminated_movies = []
+    
     # Find movies with the LEAST votes (to eliminate) - keep movies with most votes
     if vote_counts:
         min_votes = min(vote_counts.values())
@@ -78,14 +81,21 @@ def advance_session_round(db: Session, session_id: int) -> Optional[SessionModel
         if min_votes < max_votes:
             movies_to_eliminate = [movie_id for movie_id, count in vote_counts.items() if count == min_votes]
             
-            # Mark movies as eliminated
+            # Mark movies as eliminated and collect info for broadcasting
             for movie_id in movies_to_eliminate:
                 movie = db.query(Movie).filter(Movie.id == movie_id).first()
                 if movie:
                     movie.eliminated_round = db_session.current_round
+                    eliminated_movies.append({
+                        "movie_id": movie.id,
+                        "title": movie.title,
+                        "vote_count": vote_counts[movie_id],
+                        "eliminated_round": db_session.current_round
+                    })
                     db.commit()
     
     # Advance to next round
+    old_round = db_session.current_round
     db_session.current_round += 1
     
     # Check if game is finished (only one movie left)
@@ -93,6 +103,7 @@ def advance_session_round(db: Session, session_id: int) -> Optional[SessionModel
         and_(Movie.session_id == session_id, Movie.eliminated_round.is_(None))
     ).count()
     
+    winner_info = None
     if active_movies <= 1:
         db_session.status = "finished"
         # Set winner if only one movie left
@@ -102,11 +113,24 @@ def advance_session_round(db: Session, session_id: int) -> Optional[SessionModel
             ).first()
             if winner:
                 db_session.winner_movie_id = winner.id
+                winner_info = {
+                    "movie_id": winner.id,
+                    "title": winner.title
+                }
                 db.commit()
     
     db.commit()
     db.refresh(db_session)
-    return db_session
+    
+    # Return detailed results for broadcasting
+    return {
+        "session": db_session,
+        "eliminated_movies": eliminated_movies,
+        "old_round": old_round,
+        "new_round": db_session.current_round,
+        "winner": winner_info,
+        "vote_counts": vote_counts
+    }
 
 # Participant CRUD operations
 def create_participant(db: Session, participant: ParticipantCreate) -> Participant:
