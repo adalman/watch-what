@@ -177,6 +177,12 @@ export const apiService = {
       return responses.map(res => res.data);
     } catch (error) {
       console.error('Error voting:', error);
+      if (axios.isAxiosError(error)) {
+        const detail = error.response?.data?.detail;
+        if (detail) {
+          throw new Error(detail);
+        }
+      }
       throw new Error('Failed to submit votes. Please try again.');
     }
   },
@@ -188,6 +194,17 @@ export const apiService = {
     } catch (error) {
       console.error('Error updating session status:', error);
       throw new Error('Failed to update session status.');
+    }
+  },
+
+  // Get all votes by a participant in a specific round of a session
+  getParticipantVotesForRound: async (sessionId: number, participantId: number, roundNumber: number) => {
+    try {
+      const response = await api.get(`/sessions/${sessionId}/votes/participant/${participantId}/round/${roundNumber}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching participant votes:', error);
+      throw new Error('Failed to fetch participant votes.');
     }
   }
 }

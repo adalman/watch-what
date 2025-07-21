@@ -61,26 +61,26 @@ def advance_session_round(db: Session, session_id: int) -> Optional[dict]:
     # Initialize vote counts for all movies with 0
     vote_counts = {}
     for movie in all_movies:
-        vote_counts[movie.id] = 0
+        vote_counts[movie.id] = {
+            "movie_id": movie.id,
+            "movie_title": movie.title,
+            "vote_count": 0,
+            "round": db_session.current_round
+        }
     
     # Count actual votes
     for vote in current_round_votes:
         if vote.movie_id in vote_counts:
-            vote_counts[vote.movie_id] += 1
+            vote_counts[vote.movie_id]["vote_count"] += 1
     
     # Track eliminated movies for broadcasting
     eliminated_movies = []
     
     # Find movies with the LEAST votes (to eliminate) - keep movies with most votes
     if vote_counts:
-        min_votes = min(vote_counts.values())
-        max_votes = max(vote_counts.values())
-        
-        # Only eliminate movies with least votes if there are multiple movies with different vote counts
-        # If all movies have the same vote count, don't eliminate any
-        if min_votes < max_votes:
-            movies_to_eliminate = [movie_id for movie_id, count in vote_counts.items() if count == min_votes]
-            
+        min_votes = min(vc["vote_count"] for vc in vote_counts.values())
+        movies_to_eliminate = [movie_id for movie_id, vc in vote_counts.items() if vc["vote_count"] == min_votes]
+        if movies_to_eliminate:
             # Mark movies as eliminated and collect info for broadcasting
             for movie_id in movies_to_eliminate:
                 movie = db.query(Movie).filter(Movie.id == movie_id).first()
@@ -89,7 +89,7 @@ def advance_session_round(db: Session, session_id: int) -> Optional[dict]:
                     eliminated_movies.append({
                         "movie_id": movie.id,
                         "title": movie.title,
-                        "vote_count": vote_counts[movie_id],
+                        "vote_count": vote_counts[movie_id]["vote_count"],
                         "eliminated_round": db_session.current_round
                     })
                     db.commit()
@@ -129,7 +129,7 @@ def advance_session_round(db: Session, session_id: int) -> Optional[dict]:
         "old_round": old_round,
         "new_round": db_session.current_round,
         "winner": winner_info,
-        "vote_counts": vote_counts
+        "vote_counts": list(vote_counts.values())
     }
 
 # Participant CRUD operations

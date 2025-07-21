@@ -190,14 +190,14 @@ async def cast_vote(session_id: int, vote: VoteCreate, db: Session = Depends(get
     db_participant = crud.get_participant(db=db, participant_id=vote.participant_id)
     if db_participant is None:
         raise HTTPException(status_code=404, detail="Participant not found")
-    
+
     # Validate movie exists and is active
     db_movie = crud.get_movie(db=db, movie_id=vote.movie_id)
     if db_movie is None:
         raise HTTPException(status_code=404, detail="Movie not found")
     if db_movie.eliminated_round is not None:
         raise HTTPException(status_code=400, detail="Cannot vote for eliminated movie")
-    
+
     # Check if participant already voted for this specific movie in this round
     from sqlalchemy import and_
     existing_vote = db.query(Vote).filter(
@@ -205,6 +205,7 @@ async def cast_vote(session_id: int, vote: VoteCreate, db: Session = Depends(get
              Vote.movie_id == vote.movie_id, 
              Vote.round == vote.round)
     ).first()
+
     if existing_vote:
         raise HTTPException(status_code=400, detail="Participant already voted for this movie in this round")
     
@@ -212,7 +213,8 @@ async def cast_vote(session_id: int, vote: VoteCreate, db: Session = Depends(get
     db_vote = crud.create_vote(db=db, vote=vote)
 
     # Get round results
-    round_results = get_round_results(db, session_id, vote.round)
+    round_results = crud.get_round_results(db=db, session_id=session_id, round_number=vote.round)
+
     vote_summaries = [
         {"movie_id": v["movie_id"], "movie_title": v["movie_title"], "vote_count": v["vote_count"], "round": v["round"]}
         for v in round_results["votes"]
@@ -231,6 +233,18 @@ async def cast_vote(session_id: int, vote: VoteCreate, db: Session = Depends(get
         "message": f"{db_participant.name} voted for {db_movie.title}"
     }, session_id)
     
+    # Auto-advance round if all participants have voted
+    participants = crud.get_session_participants(db=db, session_id=session_id)
+    participant_ids = [p.id for p in participants]
+    from sqlalchemy import and_
+    votes_this_round = db.query(Vote).filter(
+        and_(Vote.session_id == session_id, Vote.round == vote.round)
+    ).all()
+    voted_participant_ids = set(v.participant_id for v in votes_this_round)
+    if set(participant_ids) == voted_participant_ids:
+        # Only advance if session is still in voting phase
+        if db_session.status in ["voting", "revote"]:
+            await advance_to_next_round(session_id, db)
     return db_vote
 
 @app.get("/sessions/{session_id}/votes/round/{round_number}", response_model=RoundResults)
@@ -253,6 +267,18 @@ async def get_session_votes(session_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Session not found")
     
     votes = crud.get_session_votes(db=db, session_id=session_id)
+    return votes
+
+@app.get("/sessions/{session_id}/votes/participant/{participant_id}/round/{round_number}", response_model=List[VoteResponse])
+async def get_participant_votes_for_round(session_id: int, participant_id: int, round_number: int, db: Session = Depends(get_db)):
+    """Get all votes by a participant in a specific round of a session"""
+    # Validate session exists
+    db_session = crud.get_session(db=db, session_id=session_id)
+    if db_session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    votes = crud.get_participant_votes(db=db, participant_id=participant_id, round_number=round_number)
+    # Filter to only votes in this session
+    votes = [v for v in votes if v.session_id == session_id]
     return votes
 
 # Session management endpoints
@@ -297,6 +323,8 @@ async def advance_to_next_round(session_id: int, db: Session = Depends(get_db)):
         await manager.broadcast_to_session({
             "type": "movie_eliminated",
             "session_id": session_id,
+            "movie_id": movie["movie_id"],
+            "eliminated_round": movie["eliminated_round"],
             "movie": movie,
             "message": f"'{movie['title']}' was eliminated with {movie['vote_count']} vote(s) in round {old_round}"
         }, session_id)
@@ -308,6 +336,7 @@ async def advance_to_next_round(session_id: int, db: Session = Depends(get_db)):
         "old_round": old_round,
         "new_round": new_round,
         "eliminated_count": len(eliminated_movies),
+        "vote_counts": result["vote_counts"],
         "message": f"Advanced to round {new_round}" + (f" - {len(eliminated_movies)} movie(s) eliminated" if eliminated_movies else "")
     }, session_id)
     

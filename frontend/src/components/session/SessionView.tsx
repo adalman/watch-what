@@ -3,13 +3,17 @@ import { useSession } from '../../context/SessionContext';
 import { SessionStatus, Movie, Participant, SessionResponse } from '../../types/api';
 import './SessionView.css';
 import { apiService } from '../../services/api';
+import RoundResultsModal from './RoundResultsModal';
 
 function SessionView() {
-  const { sessionState } = useSession();
+  const { sessionState, roundResults, showRoundResultsModal } = useSession();
   const [newMovieTitle, setNewMovieTitle] = useState('');
   const [isSubmittingMovie, setIsSubmittingMovie] = useState(false);
   const [selectedMovies, setSelectedMovies] = useState<number[]>([]);
   const [isVoting, setIsVoting] = useState(false);
+  const [votingError, setVotingError] = useState<string | null>(null);
+  const [hasVotedThisRound, setHasVotedThisRound] = useState(false);
+  const [participantVotesThisRound, setParticipantVotesThisRound] = useState<number[]>([]);
 
   const session = sessionState.session as SessionResponse;
   const currentParticipant = sessionState.currentParticipant;
@@ -33,6 +37,20 @@ function SessionView() {
     }
   };
 
+  useEffect(() => {
+    if (!session || !currentParticipant) return;
+    // Fetch participant's votes for the current round
+    apiService.getParticipantVotesForRound(session.id, currentParticipant.id, session.current_round)
+      .then((votes) => {
+        setParticipantVotesThisRound(votes.map((v: any) => v.movie_id));
+        setHasVotedThisRound(votes && votes.length > 0);
+      })
+      .catch(() => {
+        setParticipantVotesThisRound([]);
+        setHasVotedThisRound(false);
+      });
+  }, [session.id, currentParticipant?.id, session.current_round, sessionState.voteSummaries]);
+
   if (!session || !currentParticipant) {
     return <div className="session-view-error">Session data not available</div>;
   }
@@ -46,16 +64,10 @@ function SessionView() {
   // Get vote summaries for the current round
   const currentRoundVoteSummaries = sessionState.voteSummaries?.filter(vs => vs.round === session.current_round) || [];
 
-  // Get IDs of movies the current participant has already voted for in this round
-  const votedMovieIds = currentRoundVoteSummaries
-    .filter(vs => sessionState.currentParticipant && vs.movie_id && sessionState.currentParticipant.id)
-    .map(vs => vs.movie_id);
-
   // Check if the user has already voted for all active movies
-  const hasVotedAll = activeMovies.every(movie => votedMovieIds.includes(movie.id));
-
+  const hasVotedAll = activeMovies.every(movie => participantVotesThisRound.includes(movie.id));
   // Check if the user has voted for any movie in this round
-  const hasVoted = votedMovieIds.length > 0;
+  const hasVoted = participantVotesThisRound.length > 0;
 
   // Get vote count for a movie
   const getVoteCount = (movieId: number) => {
@@ -92,11 +104,12 @@ function SessionView() {
     if (selectedMovies.length === 0) return;
 
     setIsVoting(true);
+    setVotingError(null);
     try {
       await apiService.vote(session.id, selectedMovies, currentParticipant.id, session.current_round);
       setSelectedMovies([]);
     } catch (error) {
-      alert((error as Error).message || 'Error voting');
+      setVotingError((error as Error).message || 'Error voting');
     } finally {
       setIsVoting(false);
     }
@@ -243,45 +256,47 @@ function SessionView() {
       {session.status === 'voting' && (
         <div className="section">
           <h3>Vote for Movies</h3>
-          {!hasVotedAll ? (
-            <div className="voting-interface">
-              <p className="voting-instructions">
-                Select the movies you want to vote for in this round:
-              </p>
-              <div className="movie-grid">
-                {activeMovies.map(movie => {
-                  const alreadyVoted = votedMovieIds.includes(movie.id);
-                  return (
-                    <div 
-                      key={movie.id}
-                      className={`movie-card ${selectedMovies.includes(movie.id) ? 'selected' : ''} ${alreadyVoted ? 'already-voted' : ''}`}
-                      onClick={() => !alreadyVoted && toggleMovieSelection(movie.id)}
-                      style={{ opacity: alreadyVoted ? 0.5 : 1, cursor: alreadyVoted ? 'not-allowed' : 'pointer' }}
-                    >
-                      <h4>{movie.title}</h4>
-                      <p>Submitted by: {session.participants?.find(p => p.id === movie.submitted_by_participant_id)?.name || 'Unknown'}</p>
-                      <p>Votes: {getVoteCount(movie.id)}</p>
-                      {alreadyVoted && <div className="already-voted-indicator">You voted</div>}
-                      {selectedMovies.includes(movie.id) && !alreadyVoted && (
-                        <div className="selected-indicator">✓ Selected</div>
-                      )}
-                    </div>
-                  );
-                })}
+          <div className="voting-interface">
+            {hasVotedThisRound && (
+              <div className="voting-complete" style={{ marginBottom: '1rem' }}>
+                <p>✅ You've voted in this round!</p>
               </div>
-              <button 
-                onClick={handleVote}
-                disabled={isVoting || selectedMovies.length === 0 || hasVotedAll}
-                className="vote-button"
-              >
-                {isVoting ? 'Submitting Votes...' : `Vote for ${selectedMovies.length} Movie${selectedMovies.length !== 1 ? 's' : ''}`}
-              </button>
+            )}
+            <p className="voting-instructions">
+              Select the movies you want to vote for in this round:
+            </p>
+            <div className="movie-grid">
+              {activeMovies.map(movie => {
+                const alreadyVoted = participantVotesThisRound.includes(movie.id);
+                return (
+                  <div 
+                    key={movie.id}
+                    className={`movie-card ${selectedMovies.includes(movie.id) ? 'selected' : ''} ${alreadyVoted || hasVotedThisRound ? 'already-voted' : ''}`}
+                    onClick={() => !alreadyVoted && !hasVotedThisRound && toggleMovieSelection(movie.id)}
+                    style={{ opacity: alreadyVoted || hasVotedThisRound ? 0.5 : 1, cursor: alreadyVoted || hasVotedThisRound ? 'not-allowed' : 'pointer' }}
+                  >
+                    <h4>{movie.title}</h4>
+                    <p>Submitted by: {session.participants?.find(p => p.id === movie.submitted_by_participant_id)?.name || 'Unknown'}</p>
+                    <p>Votes: {getVoteCount(movie.id)}</p>
+                    {alreadyVoted && <div className="already-voted-indicator">You voted</div>}
+                    {selectedMovies.includes(movie.id) && !alreadyVoted && !hasVotedThisRound && (
+                      <div className="selected-indicator">✓ Selected</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            <div className="voting-complete">
-              <p>✅ You've voted in this round!</p>
-            </div>
-          )}
+            <button 
+              onClick={handleVote}
+              disabled={isVoting || selectedMovies.length === 0 || hasVotedAll || hasVotedThisRound}
+              className="vote-button"
+            >
+              {isVoting ? 'Submitting Votes...' : `Vote for ${selectedMovies.length} Movie${selectedMovies.length !== 1 ? 's' : ''}`}
+            </button>
+            {votingError && (
+              <div style={{ color: '#dc2626', marginTop: '0.5rem' }}>{votingError}</div>
+            )}
+          </div>
         </div>
       )}
 
@@ -318,6 +333,19 @@ function SessionView() {
         </div>
       )}
 
+      {/* Session Finished Section */}
+      {session.status === 'finished' && session.winner_movie_id && (
+        <div className="section" style={{ background: '#d1fae5', border: '2px solid #059669', borderRadius: '8px', padding: '2rem', marginBottom: '2rem', textAlign: 'center' }}>
+          <h2 style={{ color: '#059669', fontSize: '2rem', marginBottom: '1rem' }}>🎉 Winning Movie!</h2>
+          <h3 style={{ color: '#1f2937', fontSize: '1.5rem' }}>
+            {session.movies.find(m => m.id === session.winner_movie_id)?.title}
+          </h3>
+          <p style={{ color: '#374151', marginTop: '0.5rem' }}>
+            Submitted by: {session.participants.find(p => p.id === session.movies.find(m => m.id === session.winner_movie_id)?.submitted_by_participant_id)?.name || 'Unknown'}
+          </p>
+        </div>
+      )}
+
       {/* Participants Section */}
       <div className="section">
         <h3>Participants ({session.participants?.length || 0})</h3>
@@ -351,6 +379,9 @@ function SessionView() {
           Leave Session
         </button>
       </div>
+
+      {/* Round Results Modal */}
+      <RoundResultsModal show={showRoundResultsModal} roundResults={roundResults} session={session} />
     </div>
   );
 }

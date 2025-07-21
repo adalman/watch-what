@@ -125,6 +125,8 @@ export interface SessionState {
   movies: Movie[];
   participants: Participant[];
   voteSummaries: VoteSummary[];
+  roundResults: any | null;
+  showRoundResultsModal: boolean;
   // Loading and error states
   isLoading: boolean;
   error: string | null;
@@ -145,6 +147,8 @@ export interface SessionContextType {
   // Utility
   isInSession: boolean;
   isSessionCreator: boolean;
+  roundResults: any | null;
+  showRoundResultsModal: boolean;
 }
 
 // ============================================================================

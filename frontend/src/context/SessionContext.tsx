@@ -25,7 +25,9 @@ function SessionProvider({ children }: { children: ReactNode }) {
     voteSummaries: [],
     isLoading: false,
     error: null,
-    isConnected: false
+    isConnected: false,
+    roundResults: null,
+    showRoundResultsModal: false
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -44,7 +46,13 @@ function SessionProvider({ children }: { children: ReactNode }) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-
+        // If the backend sends the full session object, update it
+        if (data.session) {
+          setSessionState(prev => ({
+            ...prev,
+            session: data.session
+          }));
+        }
         switch (data.type) {
             case 'participant_joined':
                 setSessionState(prev => {
@@ -77,31 +85,30 @@ function SessionProvider({ children }: { children: ReactNode }) {
                     if (!prev.session) return prev;
                     const eliminatedMovieId = data.movie_id;
                     const eliminatedRound = data.eliminated_round ?? prev.session.current_round;
+                    const updatedMovies = prev.session.movies.map(movie =>
+                        movie.id === eliminatedMovieId
+                            ? { ...movie, eliminated_round: eliminatedRound }
+                            : movie
+                    );
                     return {
                         ...prev,
                         session: {
                             ...prev.session,
-                            movies: prev.session.movies.map(movie =>
-                                movie.id === eliminatedMovieId
-                                    ? { ...movie, eliminated_round: eliminatedRound }
-                                    : movie
-                            )
+                            movies: updatedMovies
                         }
                     };
                 });
                 break;
             case 'round_advanced':
-                setSessionState(prev => {
-                    if (!prev.session) return prev;
-                    return {
-                        ...prev,
-                        session: {
-                            ...prev.session,
-                            current_round: data.new_round,
-                            ...(data.status ? { status: data.status } : {})
-                        }
-                    };
-                });
+                setSessionState(prev => ({
+                    ...prev,
+                    roundResults: data,
+                    showRoundResultsModal: true,
+                    session: prev.session ? {
+                        ...prev.session,
+                        current_round: data.new_round
+                    } : prev.session
+                }));
                 break;
             case 'vote_cast':
                 setSessionState(prev => {
@@ -151,6 +158,16 @@ function SessionProvider({ children }: { children: ReactNode }) {
       ws.close();
     };
   }, [sessionState.session?.id]);
+
+  // Hide the round results modal after 4 seconds when it is shown
+  useEffect(() => {
+    if (sessionState.showRoundResultsModal) {
+      const timeout = setTimeout(() => {
+        setSessionState(prev => ({ ...prev, showRoundResultsModal: false }));
+      }, 4000);
+      return () => clearTimeout(timeout);
+    }
+  }, [sessionState.showRoundResultsModal]);
 
   // Action functions
   const createSession = async (participantName: string) => {
@@ -214,7 +231,9 @@ function SessionProvider({ children }: { children: ReactNode }) {
       voteSummaries: [],
       isLoading: false,
       error: null,
-      isConnected: false
+      isConnected: false,
+      roundResults: null,
+      showRoundResultsModal: false
     });
   };
 
@@ -261,7 +280,9 @@ function SessionProvider({ children }: { children: ReactNode }) {
     clearSession,
     updateSessionStatus,
     isInSession: !!sessionState.session,
-    isSessionCreator: false // TODO: Implement proper session creator logic when we have participants data
+    isSessionCreator: false, // TODO: Implement proper session creator logic when we have participants data
+    roundResults: sessionState.roundResults,
+    showRoundResultsModal: sessionState.showRoundResultsModal
   };
 
   return <SessionContext.Provider value={contextValue}>{children}</SessionContext.Provider>;
