@@ -144,5 +144,50 @@ export const apiService = {
       // Generic error fallback
       throw new Error('Failed to join session. Please check your connection and try again.');
     }
+  },
+
+  // Submit a movie to a session
+  submitMovie: async (sessionId: number, title: string, participantId: number) => {
+    try {
+      const response = await api.post(`/sessions/${sessionId}/movies/`, {
+        title,
+        session_id: sessionId,
+        submitted_by_participant_id: participantId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting movie:', error);
+      throw new Error('Failed to submit movie. Please try again.');
+    }
+  },
+
+  // Cast votes for movies in a session round
+  vote: async (sessionId: number, movieIds: number[], participantId: number, round: number) => {
+    try {
+      // The backend expects one vote per movie, so send multiple requests
+      const votePromises = movieIds.map(movieId =>
+        api.post(`/sessions/${sessionId}/votes/`, {
+          movie_id: movieId,
+          round,
+          participant_id: participantId,
+          session_id: sessionId
+        })
+      );
+      const responses = await Promise.all(votePromises);
+      return responses.map(res => res.data);
+    } catch (error) {
+      console.error('Error voting:', error);
+      throw new Error('Failed to submit votes. Please try again.');
+    }
+  },
+
+  // Update the session status (e.g., to 'voting')
+  updateSessionStatus: async (sessionId: number, status: string) => {
+    try {
+      await api.put(`/sessions/${sessionId}/status?status=${encodeURIComponent(status)}`);
+    } catch (error) {
+      console.error('Error updating session status:', error);
+      throw new Error('Failed to update session status.');
+    }
   }
 }

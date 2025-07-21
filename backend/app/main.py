@@ -153,7 +153,9 @@ async def submit_movie(session_id: int, movie: MovieCreate, db: Session = Depend
             "id": db_movie.id,
             "title": db_movie.title,
             "session_id": db_movie.session_id,
-            "submitted_by_participant_id": db_movie.submitted_by_participant_id
+            "submitted_by_participant_id": db_movie.submitted_by_participant_id,
+            "eliminated_round": db_movie.eliminated_round,
+            "created_at": db_movie.created_at.isoformat() if db_movie.created_at else None
         },
         "message": f"'{db_movie.title}' was submitted by {db_participant.name}"
     }, session_id)
@@ -209,6 +211,13 @@ async def cast_vote(session_id: int, vote: VoteCreate, db: Session = Depends(get
     # Create vote
     db_vote = crud.create_vote(db=db, vote=vote)
 
+    # Get round results
+    round_results = get_round_results(db, session_id, vote.round)
+    vote_summaries = [
+        {"movie_id": v["movie_id"], "movie_title": v["movie_title"], "vote_count": v["vote_count"], "round": v["round"]}
+        for v in round_results["votes"]
+    ]
+
     # Broadcast the vote to all connected clients
     await manager.broadcast_to_session({
         "type": "vote_cast",
@@ -218,6 +227,7 @@ async def cast_vote(session_id: int, vote: VoteCreate, db: Session = Depends(get
             "participant_id": vote.participant_id,
             "round": vote.round
         },
+        "vote_summaries": vote_summaries,
         "message": f"{db_participant.name} voted for {db_movie.title}"
     }, session_id)
     
@@ -258,6 +268,13 @@ async def update_session_status(session_id: int, status: str = Query(..., descri
     db_session = crud.update_session_status(db=db, session_id=session_id, status=status)
     if db_session is None:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Broadcast the status update to all connected clients
+    await manager.broadcast_to_session({
+        "type": "session_status_updated",
+        "session_id": session_id,
+        "status": status
+    }, session_id)
     
     return {"message": f"Session status updated to {status}", "session_id": session_id}
 

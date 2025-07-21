@@ -11,6 +11,9 @@ export interface Session {
   winner_movie_id: number | null;
   created_at: string; // ISO datetime string
   updated_at: string | null;
+  movies: Movie[];
+  participants: Participant[];
+  voteSummaries: VoteSummary[];
 }
 
 export interface Participant {
@@ -38,6 +41,12 @@ export interface Vote {
   created_at: string;
 }
 
+export interface VoteSummary {
+  movie_id: number;
+  movie_title: string;
+  vote_count: number;
+  round: number;
+}
 // ============================================================================
 // ENUM TYPES
 // Define the possible values for status fields
@@ -98,13 +107,6 @@ export interface SessionStatusResponse {
   winner_movie_id: number | null;
 }
 
-export interface VoteSummary {
-  movie_id: number;
-  movie_title: string;
-  vote_count: number;
-  round: number;
-}
-
 export interface RoundResults {
   round: number;
   votes: VoteSummary[];
@@ -120,11 +122,12 @@ export interface SessionState {
   // Current session data
   session: Session | null;
   currentParticipant: Participant | null;
-  
+  movies: Movie[];
+  participants: Participant[];
+  voteSummaries: VoteSummary[];
   // Loading and error states
   isLoading: boolean;
   error: string | null;
-  
   // UI state
   isConnected: boolean; // WebSocket connection status
 }
